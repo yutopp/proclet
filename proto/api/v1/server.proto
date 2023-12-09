@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package v1;
+
+option go_package="github.com/yutopp/koya/pkg/api/v1";
+
+service KoyaService {
+  rpc Run (stream Request) returns (stream Response) {}
+}
+
+message Request {
+  string code = 1;
+}
+
+message Response {
+  string stdout = 1;
+}
