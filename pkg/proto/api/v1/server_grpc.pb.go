@@ -22,7 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type KoyaServiceClient interface {
-	Run(ctx context.Context, opts ...grpc.CallOption) (KoyaService_RunClient, error)
+	RunOneshot(ctx context.Context, in *RunOneshotRequest, opts ...grpc.CallOption) (KoyaService_RunOneshotClient, error)
 }
 
 type koyaServiceClient struct {
@@ -33,31 +33,32 @@ func NewKoyaServiceClient(cc grpc.ClientConnInterface) KoyaServiceClient {
 	return &koyaServiceClient{cc}
 }
 
-func (c *koyaServiceClient) Run(ctx context.Context, opts ...grpc.CallOption) (KoyaService_RunClient, error) {
-	stream, err := c.cc.NewStream(ctx, &KoyaService_ServiceDesc.Streams[0], "/v1.KoyaService/Run", opts...)
+func (c *koyaServiceClient) RunOneshot(ctx context.Context, in *RunOneshotRequest, opts ...grpc.CallOption) (KoyaService_RunOneshotClient, error) {
+	stream, err := c.cc.NewStream(ctx, &KoyaService_ServiceDesc.Streams[0], "/v1.KoyaService/RunOneshot", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &koyaServiceRunClient{stream}
+	x := &koyaServiceRunOneshotClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
 	return x, nil
 }
 
-type KoyaService_RunClient interface {
-	Send(*Request) error
-	Recv() (*Response, error)
+type KoyaService_RunOneshotClient interface {
+	Recv() (*RunOneshotResponse, error)
 	grpc.ClientStream
 }
 
-type koyaServiceRunClient struct {
+type koyaServiceRunOneshotClient struct {
 	grpc.ClientStream
 }
 
-func (x *koyaServiceRunClient) Send(m *Request) error {
-	return x.ClientStream.SendMsg(m)
-}
-
-func (x *koyaServiceRunClient) Recv() (*Response, error) {
-	m := new(Response)
+func (x *koyaServiceRunOneshotClient) Recv() (*RunOneshotResponse, error) {
+	m := new(RunOneshotResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -68,7 +69,7 @@ func (x *koyaServiceRunClient) Recv() (*Response, error) {
 // All implementations must embed UnimplementedKoyaServiceServer
 // for forward compatibility
 type KoyaServiceServer interface {
-	Run(KoyaService_RunServer) error
+	RunOneshot(*RunOneshotRequest, KoyaService_RunOneshotServer) error
 	mustEmbedUnimplementedKoyaServiceServer()
 }
 
@@ -76,8 +77,8 @@ type KoyaServiceServer interface {
 type UnimplementedKoyaServiceServer struct {
 }
 
-func (UnimplementedKoyaServiceServer) Run(KoyaService_RunServer) error {
-	return status.Errorf(codes.Unimplemented, "method Run not implemented")
+func (UnimplementedKoyaServiceServer) RunOneshot(*RunOneshotRequest, KoyaService_RunOneshotServer) error {
+	return status.Errorf(codes.Unimplemented, "method RunOneshot not implemented")
 }
 func (UnimplementedKoyaServiceServer) mustEmbedUnimplementedKoyaServiceServer() {}
 
@@ -92,30 +93,25 @@ func RegisterKoyaServiceServer(s grpc.ServiceRegistrar, srv KoyaServiceServer) {
 	s.RegisterService(&KoyaService_ServiceDesc, srv)
 }
 
-func _KoyaService_Run_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(KoyaServiceServer).Run(&koyaServiceRunServer{stream})
-}
-
-type KoyaService_RunServer interface {
-	Send(*Response) error
-	Recv() (*Request, error)
-	grpc.ServerStream
-}
-
-type koyaServiceRunServer struct {
-	grpc.ServerStream
-}
-
-func (x *koyaServiceRunServer) Send(m *Response) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func (x *koyaServiceRunServer) Recv() (*Request, error) {
-	m := new(Request)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
-		return nil, err
+func _KoyaService_RunOneshot_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(RunOneshotRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	return m, nil
+	return srv.(KoyaServiceServer).RunOneshot(m, &koyaServiceRunOneshotServer{stream})
+}
+
+type KoyaService_RunOneshotServer interface {
+	Send(*RunOneshotResponse) error
+	grpc.ServerStream
+}
+
+type koyaServiceRunOneshotServer struct {
+	grpc.ServerStream
+}
+
+func (x *koyaServiceRunOneshotServer) Send(m *RunOneshotResponse) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 // KoyaService_ServiceDesc is the grpc.ServiceDesc for KoyaService service.
@@ -127,10 +123,9 @@ var KoyaService_ServiceDesc = grpc.ServiceDesc{
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "Run",
-			Handler:       _KoyaService_Run_Handler,
+			StreamName:    "RunOneshot",
+			Handler:       _KoyaService_RunOneshot_Handler,
 			ServerStreams: true,
-			ClientStreams: true,
 		},
 	},
 	Metadata: "proto/api/v1/server.proto",

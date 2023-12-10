@@ -2,7 +2,6 @@ package cli
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"log"
 
@@ -12,19 +11,18 @@ import (
 	pbv1 "github.com/yutopp/koya/pkg/proto/api/v1"
 )
 
+var addr string
+
 func init() {
+	clientCmd.Flags().StringVarP(&addr, "addr", "a", "localhost:50051", "server address")
+
 	rootCmd.AddCommand(clientCmd)
 }
 
 var clientCmd = &cobra.Command{
 	Use: "client",
 	Run: func(cmd *cobra.Command, args []string) {
-		port := 50051
-
-		conn, err := grpc.Dial(
-			fmt.Sprintf("localhost:%d", port),
-			grpc.WithInsecure(),
-		)
+		conn, err := grpc.Dial(addr, grpc.WithInsecure())
 		if err != nil {
 			log.Panicf("failed to connect: %s", err)
 		}
@@ -33,14 +31,9 @@ var clientCmd = &cobra.Command{
 		c := pbv1.NewKoyaServiceClient(conn)
 
 		ctx := cmd.Context()
-		runC, err := c.Run(ctx)
+		runC, err := c.RunOneshot(ctx, &pbv1.RunOneshotRequest{})
 		if err != nil {
 			log.Panicf("failed to run: %s", err)
-		}
-
-		err = runC.Send(&pbv1.Request{Code: "hello"})
-		if err != nil {
-			log.Panicf("failed to send: %s", err)
 		}
 
 		for {

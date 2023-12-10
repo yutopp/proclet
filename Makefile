@@ -13,3 +13,11 @@ generate-proto:
 .PHONY: build
 build:
 	go build -o ./bin/koya ./cmd/koya/main.go
+
+.PHONY: build-linux-amd64
+build-linux-amd64:
+	GOOS=linux GOARCH=amd64 go build -o ./bin/koya-linux-amd64 ./cmd/koya/main.go
+
+.PHONY: deploy
+deploy: build-linux-amd64
+	./deploy/deploy.sh

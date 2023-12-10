@@ -9,9 +9,6 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use: "koya",
-	Run: func(cmd *cobra.Command, args []string) {
-		// Do nothing
-	},
 }
 
 func Execute() {
