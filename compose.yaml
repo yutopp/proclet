@@ -1,0 +1,23 @@
+version: '3'
+services:
+  envoy:
+    build:
+      context: ./proxy
+    container_name: envoy-grpc-proxy
+    ports:
+      - 9000:9000
+  frontend:
+    build:
+      context: ./frontend
+    container_name: frontend
+    ports:
+      - 80:80
+  backend:
+    build:
+      context: .
+    container_name: backend
+    volumes:
+      # NOTICE: Use the same docker socket as the host
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - 50051:50051
