@@ -21,3 +21,11 @@ build-linux-amd64:
 .PHONY: deploy
 deploy: build-linux-amd64
 	./deploy/deploy.sh
+
+.PHONY: envoy
+envoy:
+	docker compose up envoy --force-recreate --build
+
+.PHONY: prod
+prod:
+	docker compose up -d --force-recreate --build --env-file .env.prod

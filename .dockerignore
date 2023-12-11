@@ -1,4 +1,5 @@
-./bin
-./deploy
-./frontend
-./proxy
+/bin
+/deploy
+/frontend
+/proxy
+/.env.*
