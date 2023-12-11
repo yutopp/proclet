@@ -28,4 +28,4 @@ envoy:
 
 .PHONY: prod
 prod:
-	docker compose up -d --force-recreate --build --env-file .env.prod
+	docker compose --env-file .env.prod up -d --force-recreate --build 
