@@ -25,9 +25,30 @@ export interface RunOneshotRequest {
  */
 export interface RunOneshotResponse {
     /**
-     * @generated from protobuf field: string stdout = 1;
+     * @generated from protobuf oneof: response
      */
-    stdout: string;
+    response: {
+        oneofKind: "output";
+        /**
+         * @generated from protobuf field: v1.Output output = 1;
+         */
+        output: Output;
+    } | {
+        oneofKind: undefined;
+    };
+}
+/**
+ * @generated from protobuf message v1.Output
+ */
+export interface Output {
+    /**
+     * @generated from protobuf field: int64 kind = 1;
+     */
+    kind: bigint; // 0 = stdout, 1 = stderr
+    /**
+     * @generated from protobuf field: bytes buffer = 2;
+     */
+    buffer: Uint8Array;
 }
 // @generated message type with reflection information, may provide speed optimized methods
 class RunOneshotRequest$Type extends MessageType<RunOneshotRequest> {
@@ -80,12 +101,12 @@ export const RunOneshotRequest = new RunOneshotRequest$Type();
 class RunOneshotResponse$Type extends MessageType<RunOneshotResponse> {
     constructor() {
         super("v1.RunOneshotResponse", [
-            { no: 1, name: "stdout", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+            { no: 1, name: "output", kind: "message", oneof: "response", T: () => Output }
         ]);
     }
     create(value?: PartialMessage<RunOneshotResponse>): RunOneshotResponse {
         const message = globalThis.Object.create((this.messagePrototype!));
-        message.stdout = "";
+        message.response = { oneofKind: undefined };
         if (value !== undefined)
             reflectionMergePartial<RunOneshotResponse>(this, message, value);
         return message;
@@ -95,8 +116,11 @@ class RunOneshotResponse$Type extends MessageType<RunOneshotResponse> {
         while (reader.pos < end) {
             let [fieldNo, wireType] = reader.tag();
             switch (fieldNo) {
-                case /* string stdout */ 1:
-                    message.stdout = reader.string();
+                case /* v1.Output output */ 1:
+                    message.response = {
+                        oneofKind: "output",
+                        output: Output.internalBinaryRead(reader, reader.uint32(), options, (message.response as any).output)
+                    };
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -110,9 +134,9 @@ class RunOneshotResponse$Type extends MessageType<RunOneshotResponse> {
         return message;
     }
     internalBinaryWrite(message: RunOneshotResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
-        /* string stdout = 1; */
-        if (message.stdout !== "")
-            writer.tag(1, WireType.LengthDelimited).string(message.stdout);
+        /* v1.Output output = 1; */
+        if (message.response.oneofKind === "output")
+            Output.internalBinaryWrite(message.response.output, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -123,6 +147,61 @@ class RunOneshotResponse$Type extends MessageType<RunOneshotResponse> {
  * @generated MessageType for protobuf message v1.RunOneshotResponse
  */
 export const RunOneshotResponse = new RunOneshotResponse$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class Output$Type extends MessageType<Output> {
+    constructor() {
+        super("v1.Output", [
+            { no: 1, name: "kind", kind: "scalar", T: 3 /*ScalarType.INT64*/, L: 0 /*LongType.BIGINT*/ },
+            { no: 2, name: "buffer", kind: "scalar", T: 12 /*ScalarType.BYTES*/ }
+        ]);
+    }
+    create(value?: PartialMessage<Output>): Output {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.kind = 0n;
+        message.buffer = new Uint8Array(0);
+        if (value !== undefined)
+            reflectionMergePartial<Output>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: Output): Output {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* int64 kind */ 1:
+                    message.kind = reader.int64().toBigInt();
+                    break;
+                case /* bytes buffer */ 2:
+                    message.buffer = reader.bytes();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: Output, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* int64 kind = 1; */
+        if (message.kind !== 0n)
+            writer.tag(1, WireType.Varint).int64(message.kind);
+        /* bytes buffer = 2; */
+        if (message.buffer.length)
+            writer.tag(2, WireType.LengthDelimited).bytes(message.buffer);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message v1.Output
+ */
+export const Output = new Output$Type();
 /**
  * @generated ServiceType for protobuf service v1.KoyaService
  */
