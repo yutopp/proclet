@@ -45,7 +45,11 @@ var clientCmd = &cobra.Command{
 				log.Panicf("failed to recv: %s", err)
 			}
 
-			log.Printf("stdout: %s", res.GetStdout())
+			switch res := res.Response.(type) {
+			case *pbv1.RunOneshotResponse_Output:
+				// res.Output.Kind
+				log.Printf("output: %s", res.Output.Buffer)
+			}
 		}
 	},
 }
