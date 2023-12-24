@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"time"
 
@@ -14,6 +15,16 @@ import (
 )
 
 type SandboxRunner struct {
+}
+
+type RunTask struct {
+	Cmd string
+
+	Stdin  io.Reader
+	Stdout io.WriteCloser
+	Stderr io.WriteCloser
+
+	Limits ResourceLimits
 }
 
 type ResourceLimits struct {
@@ -29,33 +40,22 @@ func NewSandboxRunner() *SandboxRunner {
 }
 
 type Handle struct {
-	Output chan []byte
-	RespCh <-chan container.WaitResponse
-	ErrCh  <-chan error
-	DoneCh chan struct{}
+	DoneCh chan interface{}
 }
 
-func (e *SandboxRunner) Run(ctx context.Context, code string) (*Handle, error) {
+func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return nil, err
-	}
-
-	resourceLimit := ResourceLimits{
-		Memory:     6 * 1024 * 1024, // 6MiB
-		MemorySoft: 6 * 1024 * 1024, // 4MiB
-		CPUCore:    250000000,       // 0.25 core
-		PIDNum:     10,              // 10 processes
-		TimeoutSec: 1,
 	}
 
 	log.Println("create")
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image:       "alpine",
-		Cmd:         []string{"/bin/sh", "-c", "ulimit -a; sleep 3; echo monyomonyo"},
+		Cmd:         []string{"/bin/sh", "-c", task.Cmd},
 		StopSignal:  "SIGKILL",
-		StopTimeout: &resourceLimit.TimeoutSec,
+		StopTimeout: &task.Limits.TimeoutSec,
 	}, &container.HostConfig{
 		AutoRemove:     true,
 		ReadonlyRootfs: true,
@@ -69,8 +69,8 @@ func (e *SandboxRunner) Run(ctx context.Context, code string) (*Handle, error) {
 				},
 				{
 					Name: "cpu",
-					Soft: int64(resourceLimit.TimeoutSec),
-					Hard: int64(resourceLimit.TimeoutSec),
+					Soft: int64(task.Limits.TimeoutSec),
+					Hard: int64(task.Limits.TimeoutSec),
 				},
 			},
 		},
@@ -82,10 +82,7 @@ func (e *SandboxRunner) Run(ctx context.Context, code string) (*Handle, error) {
 	containerID := resp.ID
 
 	handle := &Handle{}
-	handle.Output = make(chan []byte)
-	handle.DoneCh = make(chan struct{})
-	//handle.RespCh = respCh
-	//handle.ErrCh = errCh
+	handle.DoneCh = make(chan interface{})
 
 	log.Println("stats")
 
@@ -126,8 +123,10 @@ func (e *SandboxRunner) Run(ctx context.Context, code string) (*Handle, error) {
 	go func() {
 		defer hijack.Close()
 		defer hijack.Conn.Close()
+		defer task.Stdout.Close()
+		defer task.Stderr.Close()
 
-		_, err := stdcopy.StdCopy(log.Writer(), log.Writer(), hijack.Reader)
+		_, err := stdcopy.StdCopy(task.Stdout, task.Stderr, hijack.Reader)
 		if err != nil {
 			log.Println("err(hijack): ", err)
 			return
@@ -146,22 +145,26 @@ func (e *SandboxRunner) Run(ctx context.Context, code string) (*Handle, error) {
 	respCh, errCh := cli.ContainerWait(ctx, containerID, "")
 	go func() {
 		defer close(handle.DoneCh)
+
 		select {
 		case <-ctx.Done():
 			log.Println("ctx done")
+
 		case resp := <-respCh:
 			log.Printf("resp: %+v", resp)
+			handle.DoneCh <- resp
+
 		case err := <-errCh:
 			log.Printf("err: %+v", err)
+			handle.DoneCh <- err
 		}
 	}()
-	handle.RespCh = respCh
-	handle.ErrCh = errCh
 
 	// Realtime checking apart from cgroup limits to prevent sleep() function running infinite.
+	stopCtx := context.WithoutCancel(ctx)
 	go func() {
 		const extensionSec = 3
-		t := time.NewTimer(time.Duration(resourceLimit.TimeoutSec+extensionSec) * time.Second)
+		t := time.NewTimer(time.Duration(task.Limits.TimeoutSec+extensionSec) * time.Second)
 		defer t.Stop()
 
 		select {
@@ -169,7 +172,7 @@ func (e *SandboxRunner) Run(ctx context.Context, code string) (*Handle, error) {
 			log.Println("done")
 		case <-t.C:
 			immidiate := 0
-			err := cli.ContainerStop(ctx, containerID, container.StopOptions{
+			err := cli.ContainerStop(stopCtx, containerID, container.StopOptions{
 				Timeout: &immidiate,
 				Signal:  "SIGKILL",
 			})
