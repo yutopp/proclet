@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package v1;
 
-option go_package="github.com/yutopp/koya/pkg/api/v1";
+option go_package="github.com/yutopp/koya/pkg/proto/api/v1";
 
 service KoyaService {
   rpc RunOneshot (RunOneshotRequest) returns (stream RunOneshotResponse) {}

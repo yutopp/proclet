@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 
+	"github.com/rs/cors"
 	"github.com/spf13/cobra"
-	"google.golang.org/grpc"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 
-	v1 "github.com/yutopp/koya/pkg/server"
+	apiv1 "github.com/yutopp/koya/pkg/server"
 )
 
 func init() {
@@ -18,7 +21,7 @@ func init() {
 var serverCmd = &cobra.Command{
 	Use: "server",
 	Run: func(cmd *cobra.Command, args []string) {
-		port := 50051
+		port := 9000
 
 		log.Printf("start server on port %d", port)
 		if err := run(port); err != nil {
@@ -33,10 +36,10 @@ func run(port int) error {
 		return err
 	}
 
-	grpcServer := grpc.NewServer()
+	mux := http.NewServeMux()
 
-	srv := v1.NewServer()
-	v1.Register(grpcServer, srv)
+	srv := apiv1.NewServer()
+	apiv1.Register(mux, srv)
 
-	return grpcServer.Serve(lis)
+	return http.Serve(lis, cors.AllowAll().Handler(h2c.NewHandler(mux, &http2.Server{})))
 }

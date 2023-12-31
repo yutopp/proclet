@@ -1,20 +1,20 @@
 package cli
 
 import (
-	"errors"
-	"io"
 	"log"
+	"net/http"
 
+	"connectrpc.com/connect"
 	"github.com/spf13/cobra"
-	"google.golang.org/grpc"
 
-	pbv1 "github.com/yutopp/koya/pkg/proto/api/v1"
+	apiv1pb "github.com/yutopp/koya/pkg/proto/api/v1"
+	apiv1connect "github.com/yutopp/koya/pkg/proto/api/v1/v1connect"
 )
 
 var addr string
 
 func init() {
-	clientCmd.Flags().StringVarP(&addr, "addr", "a", "localhost:50051", "server address")
+	clientCmd.Flags().StringVarP(&addr, "addr", "a", "http://localhost:9000", "server address")
 
 	rootCmd.AddCommand(clientCmd)
 }
@@ -22,34 +22,26 @@ func init() {
 var clientCmd = &cobra.Command{
 	Use: "client",
 	Run: func(cmd *cobra.Command, args []string) {
-		conn, err := grpc.Dial(addr, grpc.WithInsecure())
-		if err != nil {
-			log.Panicf("failed to connect: %s", err)
-		}
-		defer conn.Close()
-
-		c := pbv1.NewKoyaServiceClient(conn)
+		c := apiv1connect.NewKoyaServiceClient(http.DefaultClient, addr, connect.WithGRPC())
 
 		ctx := cmd.Context()
-		runC, err := c.RunOneshot(ctx, &pbv1.RunOneshotRequest{})
+		stream, err := c.RunOneshot(ctx, connect.NewRequest(&apiv1pb.RunOneshotRequest{
+			Code: "ulimit -a; uname -a; whoami; sleep 5; echo hello",
+		}))
 		if err != nil {
 			log.Panicf("failed to run: %s", err)
 		}
 
-		for {
-			res, err := runC.Recv()
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				log.Panicf("failed to recv: %s", err)
-			}
-
-			switch res := res.Response.(type) {
-			case *pbv1.RunOneshotResponse_Output:
+		for stream.Receive() {
+			res := stream.Msg().GetResponse()
+			switch res := res.(type) {
+			case *apiv1pb.RunOneshotResponse_Output:
 				// res.Output.Kind
 				log.Printf("output: %s", res.Output.Buffer)
 			}
+		}
+		if err := stream.Err(); err != nil {
+			log.Panicf("failed to receive: %s", err)
 		}
 	},
 }

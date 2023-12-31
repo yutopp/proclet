@@ -1,39 +1,45 @@
 package server
 
 import (
+	"context"
 	"io"
 	"log"
+	"net/http"
 	"sync"
 
-	"google.golang.org/grpc"
+	"connectrpc.com/connect"
 
-	pb "github.com/yutopp/koya/pkg/proto/api/v1"
+	apiv1pb "github.com/yutopp/koya/pkg/proto/api/v1"
+	apiv1connect "github.com/yutopp/koya/pkg/proto/api/v1/v1connect"
 	"github.com/yutopp/koya/pkg/service/executor"
 )
 
 // Server implements the KoyaServiceServer interface
-type Server struct {
-	pb.UnimplementedKoyaServiceServer
-}
+type Server struct{}
 
-var _ pb.KoyaServiceServer = (*Server)(nil)
+var _ apiv1connect.KoyaServiceHandler = (*Server)(nil)
 
-func Register(s *grpc.Server, srv *Server) {
-	pb.RegisterKoyaServiceServer(s, srv)
+func Register(mux *http.ServeMux, srv *Server) {
+	path, handler := apiv1connect.NewKoyaServiceHandler(srv)
+	mux.Handle(path, handler)
 }
 
 func NewServer() *Server {
 	return &Server{}
 }
 
-func (s *Server) RunOneshot(request *pb.RunOneshotRequest, stream pb.KoyaService_RunOneshotServer) error {
+func (s *Server) RunOneshot(
+	ctx context.Context,
+	req *connect.Request[apiv1pb.RunOneshotRequest],
+	stream *connect.ServerStream[apiv1pb.RunOneshotResponse],
+) error {
 	e := executor.NewSandboxRunner()
 
 	stdoutR, stdoutW := io.Pipe()
 	stderrR, stderrW := io.Pipe()
 	task := &executor.RunTask{
 		Image: "alpine",
-		Cmd:   request.Code,
+		Cmd:   req.Msg.Code,
 
 		Stdin:  nil,
 		Stdout: stdoutW,
@@ -47,7 +53,7 @@ func (s *Server) RunOneshot(request *pb.RunOneshotRequest, stream pb.KoyaService
 			TimeoutSec: 1,
 		},
 	}
-	handle, err := e.Run(stream.Context(), task)
+	handle, err := e.Run(ctx, task)
 	if err != nil {
 		return err
 	}
@@ -55,22 +61,22 @@ func (s *Server) RunOneshot(request *pb.RunOneshotRequest, stream pb.KoyaService
 	var ioWg sync.WaitGroup
 	ioWg.Add(2) // stdout, stderr
 	go redirect(&ioWg, stdoutR, func(buf []byte) bool {
-		outVal := &pb.Output{
+		outVal := &apiv1pb.Output{
 			Kind:   0, // stdout
 			Buffer: buf,
 		}
-		if err := stream.Send(&pb.RunOneshotResponse{Response: &pb.RunOneshotResponse_Output{Output: outVal}}); err != nil {
+		if err := stream.Send(&apiv1pb.RunOneshotResponse{Response: &apiv1pb.RunOneshotResponse_Output{Output: outVal}}); err != nil {
 			return false
 		}
 
 		return true
 	})
 	go redirect(&ioWg, stderrR, func(buf []byte) bool {
-		outVal := &pb.Output{
+		outVal := &apiv1pb.Output{
 			Kind:   1, // stderr
 			Buffer: buf,
 		}
-		if err := stream.Send(&pb.RunOneshotResponse{Response: &pb.RunOneshotResponse_Output{Output: outVal}}); err != nil {
+		if err := stream.Send(&apiv1pb.RunOneshotResponse{Response: &apiv1pb.RunOneshotResponse_Output{Output: outVal}}); err != nil {
 			return false
 		}
 
@@ -79,7 +85,7 @@ func (s *Server) RunOneshot(request *pb.RunOneshotRequest, stream pb.KoyaService
 	ioWg.Wait()
 
 	select {
-	case <-stream.Context().Done():
+	case <-ctx.Done():
 		return nil
 
 	case out, ok := <-handle.DoneCh:
@@ -119,4 +125,5 @@ type Language struct {
 }
 
 type LanguageEnv struct {
+	ID string
 }

@@ -1,14 +1,13 @@
 .PHONY: install-tools
 install-tools:
+	go install github.com/bufbuild/buf/cmd/buf@v1.28.1
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28
-	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
+	go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest
 
 .PHONY: generate-proto
 generate-proto:
-	protoc \
-		--go_out=./pkg --go_opt=paths=source_relative \
-		--go-grpc_out=./pkg --go-grpc_opt=paths=source_relative \
-		proto/api/v1/*.proto
+	# buf lint
+	buf generate
 
 .PHONY: build
 build:
@@ -21,10 +20,6 @@ build-linux-amd64:
 .PHONY: deploy
 deploy: build-linux-amd64
 	./deploy/deploy.sh
-
-.PHONY: envoy
-envoy:
-	docker compose up envoy --force-recreate --build
 
 .PHONY: docker-up
 docker-up:

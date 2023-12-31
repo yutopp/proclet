@@ -1,6 +1,8 @@
 //import { useState } from 'react'
-import { KoyaServiceClient } from "./proto/api/v1/server.client";
-import { GrpcWebFetchTransport } from "@protobuf-ts/grpcweb-transport";
+
+import { createPromiseClient, ConnectError } from "@connectrpc/connect";
+import { createConnectTransport } from "@connectrpc/connect-web";
+import { KoyaService } from "./proto/api/v1/server_connect";
 import React from 'react'
 import { Terminal } from 'xterm'
 import { config } from "./constants";
@@ -36,33 +38,34 @@ function App() {
   }, [])
 
   const fetchData = async (source: string, signal: AbortSignal) => {
-    const client = new KoyaServiceClient(
-      new GrpcWebFetchTransport({
-        baseUrl: config.BACKEND_URL,
-      })
-    );
+    const transport = createConnectTransport({
+      baseUrl: config.BACKEND_URL,
+    });
+    const client = createPromiseClient(KoyaService, transport);
 
     try {
+      const opts = {
+        signal: signal,
+      };
       const call = client.runOneshot({
         code: source,
-      }, {
-        abort: signal,
-      });
-      for await (const message of call.responses) {
+      }, opts);
+      for await (const message of call) {
         console.log("got a message", message)
-        switch (message.response.oneofKind) {
+        switch (message.response.case) {
           case "output":
             // TODO: stderr
-            termRef.current.term.write(message.response.output.buffer);
+            termRef.current.term.write(message.response.value.buffer);
             break;
         }
       }
-      let { status, trailers } = await call;
-      console.log("status", status);
-      console.log("trailers", trailers);
     }
     catch (e) {
-      console.error(e);
+      if (e instanceof ConnectError) {
+        console.error(e.code, e.message, e.metadata);
+      } else {
+        console.error(e);
+      }
     }
   };
 
