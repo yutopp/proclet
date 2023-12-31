@@ -11,7 +11,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-units"
 )
 
@@ -109,33 +108,33 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 	}()
 
 	log.Println("attach")
-
-	hijack, err := cli.ContainerAttach(ctx, containerID, types.ContainerAttachOptions{
-		Stream: true,
-		Stdin:  true,
-		Stdout: true,
-		Stderr: true,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to attach container")
-	}
-
-	log.Println("go")
-
-	go func() {
-		defer hijack.Close()
-		defer hijack.Conn.Close()
-		defer task.Stdout.Close()
-		defer task.Stderr.Close()
-
-		_, err := stdcopy.StdCopy(task.Stdout, task.Stderr, hijack.Reader)
+	/*
+		hijack, err := cli.ContainerAttach(ctx, containerID, types.ContainerAttachOptions{
+			Stream: true,
+			Stdin:  true,
+			Stdout: true,
+			Stderr: true,
+		})
 		if err != nil {
-			log.Println("err(hijack): ", err)
-			return
+			return nil, errors.Wrap(err, "failed to attach container")
 		}
-		log.Println("done(hijack): ", err)
-	}()
 
+		log.Println("go")
+
+		go func() {
+			defer hijack.Close()
+			defer hijack.Conn.Close()
+			defer task.Stdout.Close()
+			defer task.Stderr.Close()
+
+			_, err := stdcopy.StdCopy(task.Stdout, task.Stderr, hijack.Reader)
+			if err != nil {
+				log.Println("err(hijack): ", err)
+				return
+			}
+			log.Println("done(hijack): ", err)
+		}()
+	*/
 	log.Println("start")
 
 	if err := cli.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); err != nil {
