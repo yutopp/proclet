@@ -26,6 +26,6 @@ deploy: build-linux-amd64
 envoy:
 	docker compose up envoy --force-recreate --build
 
-.PHONY: prod
-prod:
-	docker compose --env-file .env.prod up -d --force-recreate --build 
+.PHONY: docker-up
+docker-up:
+	docker compose up -d --force-recreate --build
