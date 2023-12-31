@@ -18,7 +18,8 @@ type SandboxRunner struct {
 }
 
 type RunTask struct {
-	Cmd string
+	Image string
+	Cmd   string
 
 	Stdin  io.Reader
 	Stdout io.WriteCloser
@@ -52,7 +53,7 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 	log.Println("create")
 
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image:       "alpine",
+		Image:       task.Image,
 		Cmd:         []string{"/bin/sh", "-c", task.Cmd},
 		StopSignal:  "SIGKILL",
 		StopTimeout: &task.Limits.TimeoutSec,

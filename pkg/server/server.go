@@ -32,7 +32,8 @@ func (s *Server) RunOneshot(request *pb.RunOneshotRequest, stream pb.KoyaService
 	stdoutR, stdoutW := io.Pipe()
 	stderrR, stderrW := io.Pipe()
 	task := &executor.RunTask{
-		Cmd: request.Code,
+		Image: "alpine",
+		Cmd:   request.Code,
 
 		Stdin:  nil,
 		Stdout: stdoutW,
@@ -53,44 +54,28 @@ func (s *Server) RunOneshot(request *pb.RunOneshotRequest, stream pb.KoyaService
 
 	var ioWg sync.WaitGroup
 	ioWg.Add(2) // stdout, stderr
-	go func() {
-		defer ioWg.Done()
-		buf := make([]byte, 1024)
-		for {
-			n, err := stdoutR.Read(buf)
-			if err != nil {
-				log.Printf("stdout read err: %+v", err)
-				return
-			}
-
-			outVal := &pb.Output{
-				Kind:   0, // stdout
-				Buffer: buf[:n],
-			}
-			if err := stream.Send(&pb.RunOneshotResponse{Response: &pb.RunOneshotResponse_Output{Output: outVal}}); err != nil {
-				return
-			}
+	go redirect(&ioWg, stdoutR, func(buf []byte) bool {
+		outVal := &pb.Output{
+			Kind:   0, // stdout
+			Buffer: buf,
 		}
-	}()
-	go func() {
-		defer ioWg.Done()
-		buf := make([]byte, 1024)
-		for {
-			n, err := stderrR.Read(buf)
-			if err != nil {
-				log.Printf("stderr read err: %+v", err)
-				return
-			}
-
-			outVal := &pb.Output{
-				Kind:   1, // stderr
-				Buffer: buf[:n],
-			}
-			if err := stream.Send(&pb.RunOneshotResponse{Response: &pb.RunOneshotResponse_Output{Output: outVal}}); err != nil {
-				return
-			}
+		if err := stream.Send(&pb.RunOneshotResponse{Response: &pb.RunOneshotResponse_Output{Output: outVal}}); err != nil {
+			return false
 		}
-	}()
+
+		return true
+	})
+	go redirect(&ioWg, stderrR, func(buf []byte) bool {
+		outVal := &pb.Output{
+			Kind:   1, // stderr
+			Buffer: buf,
+		}
+		if err := stream.Send(&pb.RunOneshotResponse{Response: &pb.RunOneshotResponse_Output{Output: outVal}}); err != nil {
+			return false
+		}
+
+		return true
+	})
 	ioWg.Wait()
 
 	select {
@@ -108,4 +93,30 @@ func (s *Server) RunOneshot(request *pb.RunOneshotRequest, stream pb.KoyaService
 	log.Println("rpc finished")
 
 	return nil
+}
+
+func redirect(wg *sync.WaitGroup, pipe *io.PipeReader, callback func([]byte) bool) {
+	defer wg.Done()
+
+	buf := make([]byte, 1024)
+	for {
+		n, err := pipe.Read(buf)
+		if err != nil {
+			log.Printf("stderr read err: %+v", err)
+			return
+		}
+
+		if !callback(buf[:n]) {
+			return
+		}
+	}
+}
+
+type Language struct {
+	ID       string
+	ShowName string
+	Envs     []LanguageEnv
+}
+
+type LanguageEnv struct {
 }
