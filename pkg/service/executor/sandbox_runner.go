@@ -11,7 +11,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
-	"github.com/docker/go-units"
 )
 
 type SandboxRunner struct {
@@ -57,25 +56,25 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 		Cmd:         []string{"/bin/sh", "-c", task.Cmd},
 		StopSignal:  "SIGKILL",
 		StopTimeout: &task.Limits.TimeoutSec,
-	}, &container.HostConfig{
-		AutoRemove:     true,
-		ReadonlyRootfs: true,
-		Privileged:     false,
-		Resources: container.Resources{
-			Ulimits: []*units.Ulimit{
-				{
-					Name: "nofile",
-					Soft: 10,
-					Hard: 10,
-				},
-				{
-					Name: "cpu",
-					Soft: int64(task.Limits.TimeoutSec),
-					Hard: int64(task.Limits.TimeoutSec),
+	}, /*&container.HostConfig{
+			AutoRemove:     true,
+			ReadonlyRootfs: true,
+			Privileged:     false,
+			Resources: container.Resources{
+				Ulimits: []*units.Ulimit{
+					{
+						Name: "nofile",
+						Soft: 10,
+						Hard: 10,
+					},
+					{
+						Name: "cpu",
+						Soft: int64(task.Limits.TimeoutSec),
+						Hard: int64(task.Limits.TimeoutSec),
+					},
 				},
 			},
-		},
-	}, nil, nil, "")
+		}*/nil, nil, nil, "")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create container")
 	}
