@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 )
 
 type SandboxRunner struct {
@@ -51,30 +52,36 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 
 	log.Println("create")
 
+	hostConfig := &container.HostConfig{
+		AutoRemove:     true,
+		ReadonlyRootfs: true,
+	}
+	/*&container.HostConfig{
+		AutoRemove:     true,
+		ReadonlyRootfs: true,
+		Privileged:     false,
+		Resources: container.Resources{
+			Ulimits: []*units.Ulimit{
+				{
+					Name: "nofile",
+					Soft: 10,
+					Hard: 10,
+				},
+				{
+					Name: "cpu",
+					Soft: int64(task.Limits.TimeoutSec),
+					Hard: int64(task.Limits.TimeoutSec),
+				},
+			},
+		},
+	}*/
+
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image:       task.Image,
 		Cmd:         []string{"/bin/sh", "-c", task.Cmd},
 		StopSignal:  "SIGKILL",
 		StopTimeout: &task.Limits.TimeoutSec,
-	}, /*&container.HostConfig{
-			AutoRemove:     true,
-			ReadonlyRootfs: true,
-			Privileged:     false,
-			Resources: container.Resources{
-				Ulimits: []*units.Ulimit{
-					{
-						Name: "nofile",
-						Soft: 10,
-						Hard: 10,
-					},
-					{
-						Name: "cpu",
-						Soft: int64(task.Limits.TimeoutSec),
-						Hard: int64(task.Limits.TimeoutSec),
-					},
-				},
-			},
-		}*/nil, nil, nil, "")
+	}, hostConfig, nil, nil, "")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create container")
 	}
@@ -107,33 +114,31 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 	}()
 
 	log.Println("attach")
-	/*
-		hijack, err := cli.ContainerAttach(ctx, containerID, types.ContainerAttachOptions{
-			Stream: true,
-			Stdin:  true,
-			Stdout: true,
-			Stderr: true,
-		})
+	hijack, err := cli.ContainerAttach(ctx, containerID, types.ContainerAttachOptions{
+		Stream: true,
+		Stdin:  true,
+		Stdout: true,
+		Stderr: true,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to attach container")
+	}
+
+	log.Println("go")
+
+	go func() {
+		defer hijack.Close()
+		defer hijack.Conn.Close()
+		defer task.Stdout.Close()
+		defer task.Stderr.Close()
+
+		_, err := stdcopy.StdCopy(task.Stdout, task.Stderr, hijack.Reader)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to attach container")
+			log.Println("err(hijack): ", err)
+			return
 		}
-
-		log.Println("go")
-
-		go func() {
-			defer hijack.Close()
-			defer hijack.Conn.Close()
-			defer task.Stdout.Close()
-			defer task.Stderr.Close()
-
-			_, err := stdcopy.StdCopy(task.Stdout, task.Stderr, hijack.Reader)
-			if err != nil {
-				log.Println("err(hijack): ", err)
-				return
-			}
-			log.Println("done(hijack): ", err)
-		}()
-	*/
+		log.Println("done(hijack): ", err)
+	}()
 	log.Println("start")
 
 	if err := cli.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); err != nil {
