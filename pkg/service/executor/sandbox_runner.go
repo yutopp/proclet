@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/cockroachdb/errors"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -47,7 +48,7 @@ type Handle struct {
 func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create docker client")
 	}
 
 	log.Println("create")
@@ -77,7 +78,7 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 		},
 	}, nil, nil, "")
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create container")
 	}
 
 	containerID := resp.ID
@@ -89,7 +90,7 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 
 	statsResp, err := cli.ContainerStats(ctx, containerID, true)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get container stats")
 	}
 
 	go func() {
@@ -116,7 +117,7 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 		Stderr: true,
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to attach container")
 	}
 
 	log.Println("go")
@@ -138,7 +139,7 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 	log.Println("start")
 
 	if err := cli.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to start container")
 	}
 
 	log.Println("wait")
