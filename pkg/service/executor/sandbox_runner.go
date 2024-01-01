@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/docker/go-units"
 )
 
 type SandboxRunner struct {
@@ -29,11 +30,13 @@ type RunTask struct {
 }
 
 type ResourceLimits struct {
-	Memory     int64 // bytes
-	MemorySoft int64 // bytes
-	CPUCore    int64 // 1/1000000000 core
-	PIDNum     int64
-	TimeoutSec int
+	Core    int64
+	Nofile  int64
+	NProc   int64
+	MemLock int64
+	CPUTime int64 // sec
+	Memory  int64 // bytes
+	FSize   int64
 }
 
 func NewSandboxRunner() *SandboxRunner {
@@ -42,6 +45,14 @@ func NewSandboxRunner() *SandboxRunner {
 
 type Handle struct {
 	DoneCh chan interface{}
+}
+
+func makeULimit(name string, lim int64) *units.Ulimit {
+	return &units.Ulimit{
+		Name: name,
+		Soft: lim,
+		Hard: lim,
+	}
 }
 
 func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error) {
@@ -55,32 +66,27 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 	hostConfig := &container.HostConfig{
 		AutoRemove:     true,
 		ReadonlyRootfs: true,
-	}
-	/*&container.HostConfig{
-		AutoRemove:     true,
-		ReadonlyRootfs: true,
 		Privileged:     false,
 		Resources: container.Resources{
+			Memory: task.Limits.Memory, // bytes
 			Ulimits: []*units.Ulimit{
-				{
-					Name: "nofile",
-					Soft: 10,
-					Hard: 10,
-				},
-				{
-					Name: "cpu",
-					Soft: int64(task.Limits.TimeoutSec),
-					Hard: int64(task.Limits.TimeoutSec),
-				},
+				makeULimit("core", task.Limits.Core),
+				makeULimit("nofile", task.Limits.Nofile),
+				makeULimit("nproc", task.Limits.NProc),
+				makeULimit("memlock", task.Limits.MemLock),
+				makeULimit("cpu", task.Limits.CPUTime),
+				// makeULimit("as", task.Limits.Memory), disabled by docker
+				makeULimit("fsize", task.Limits.FSize),
 			},
 		},
-	}*/
+	}
 
+	stopTimeout := 3 // seec
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image:       task.Image,
 		Cmd:         []string{"/bin/sh", "-c", task.Cmd},
 		StopSignal:  "SIGKILL",
-		StopTimeout: &task.Limits.TimeoutSec,
+		StopTimeout: &stopTimeout,
 	}, hostConfig, nil, nil, "")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create container")
@@ -169,7 +175,7 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 	stopCtx := context.WithoutCancel(ctx)
 	go func() {
 		const extensionSec = 3
-		t := time.NewTimer(time.Duration(task.Limits.TimeoutSec+extensionSec) * time.Second)
+		t := time.NewTimer(time.Duration(task.Limits.CPUTime+extensionSec) * time.Second)
 		defer t.Stop()
 
 		select {

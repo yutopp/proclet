@@ -37,6 +37,15 @@ func (s *Server) RunOneshot(
 
 	stdoutR, stdoutW := io.Pipe()
 	stderrR, stderrW := io.Pipe()
+	resourceLimit := executor.ResourceLimits{
+		Core:    0,                // Process can NOT create CORE file
+		Nofile:  512,              // Process can open 512 files
+		NProc:   30,               // Process can create processes to 30
+		MemLock: 1024,             // Process can lock 1024 Bytes by mlock(2)
+		CPUTime: 5,                // sec
+		Memory:  10 * 1024 * 1024, // bytes
+		FSize:   5 * 1024 * 1024,  // Process can writes a file only 5MiB
+	}
 	task := &executor.RunTask{
 		Image: "alpine",
 		Cmd:   req.Msg.Code,
@@ -45,13 +54,7 @@ func (s *Server) RunOneshot(
 		Stdout: stdoutW,
 		Stderr: stderrW,
 
-		Limits: executor.ResourceLimits{
-			Memory:     6 * 1024 * 1024, // 6MiB
-			MemorySoft: 6 * 1024 * 1024, // 4MiB
-			CPUCore:    250000000,       // 0.25 core
-			PIDNum:     10,              // 10 processes
-			TimeoutSec: 1,
-		},
+		Limits: resourceLimit,
 	}
 	handle, err := e.Run(ctx, task)
 	if err != nil {
