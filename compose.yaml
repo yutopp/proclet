@@ -10,6 +10,7 @@ services:
     build:
       context: .
     container_name: backend
+    command: /app/bin/koya server --uid 1001 --gid 1001
     volumes:
       # NOTICE: Use the same docker socket as the host
       - /var/run/docker.sock:/var/run/docker.sock

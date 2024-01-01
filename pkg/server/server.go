@@ -15,7 +15,9 @@ import (
 )
 
 // Server implements the KoyaServiceServer interface
-type Server struct{}
+type Server struct {
+	config *Config
+}
 
 var _ apiv1connect.KoyaServiceHandler = (*Server)(nil)
 
@@ -24,8 +26,15 @@ func Register(mux *http.ServeMux, srv *Server) {
 	mux.Handle(path, handler)
 }
 
-func NewServer() *Server {
-	return &Server{}
+type Config struct {
+	RunnerUID int
+	RunnerGID int
+}
+
+func NewServer(c *Config) *Server {
+	return &Server{
+		config: c,
+	}
 }
 
 func (s *Server) RunOneshot(
@@ -49,6 +58,9 @@ func (s *Server) RunOneshot(
 	task := &executor.RunTask{
 		Image: "alpine",
 		Cmd:   req.Msg.Code,
+
+		UID: s.config.RunnerUID,
+		GID: s.config.RunnerGID,
 
 		Stdin:  nil,
 		Stdout: stdoutW,

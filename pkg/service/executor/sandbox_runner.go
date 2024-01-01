@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"time"
@@ -22,6 +23,9 @@ type RunTask struct {
 	Image string
 	Cmd   string
 
+	UID int
+	GID int
+
 	Stdin  io.Reader
 	Stdout io.WriteCloser
 	Stderr io.WriteCloser
@@ -32,7 +36,7 @@ type RunTask struct {
 type ResourceLimits struct {
 	Core    int64
 	Nofile  int64
-	NProc   int64
+	NProc   int64 // NOTE: per-user limit
 	MemLock int64
 	CPUTime int64 // sec
 	Memory  int64 // bytes
@@ -72,7 +76,7 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 			Ulimits: []*units.Ulimit{
 				makeULimit("core", task.Limits.Core),
 				makeULimit("nofile", task.Limits.Nofile),
-				makeULimit("nproc", task.Limits.NProc),
+				makeULimit("nproc", task.Limits.NProc), // NOTE: per-user limit
 				makeULimit("memlock", task.Limits.MemLock),
 				makeULimit("cpu", task.Limits.CPUTime),
 				// makeULimit("as", task.Limits.Memory), disabled by docker
@@ -87,6 +91,7 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 		Cmd:         []string{"/bin/sh", "-c", task.Cmd},
 		StopSignal:  "SIGKILL",
 		StopTimeout: &stopTimeout,
+		User:        fmt.Sprintf("%d:%d", task.UID, task.GID),
 	}, hostConfig, nil, nil, "")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create container")

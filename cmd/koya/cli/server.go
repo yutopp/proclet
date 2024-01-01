@@ -14,7 +14,13 @@ import (
 	apiv1 "github.com/yutopp/koya/pkg/server"
 )
 
+var uid int
+var gid int
+
 func init() {
+	serverCmd.Flags().IntVar(&uid, "uid", 0, "runner uid")
+	serverCmd.Flags().IntVar(&gid, "gid", 0, "runner gid")
+
 	rootCmd.AddCommand(serverCmd)
 }
 
@@ -38,7 +44,10 @@ func run(port int) error {
 
 	mux := http.NewServeMux()
 
-	srv := apiv1.NewServer()
+	srv := apiv1.NewServer(&apiv1.Config{
+		RunnerUID: uid,
+		RunnerGID: gid,
+	})
 	apiv1.Register(mux, srv)
 
 	return http.Serve(lis, cors.AllowAll().Handler(h2c.NewHandler(mux, &http2.Server{})))
