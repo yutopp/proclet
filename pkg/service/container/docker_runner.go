@@ -1,4 +1,4 @@
-package executor
+package container
 
 import (
 	"context"
@@ -11,20 +11,22 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-units"
 )
 
-type SandboxRunner struct {
+type DockerRunner struct {
 }
 
 type RunTask struct {
-	Image string
-	Cmd   string
+	Image    string
+	ShellCmd string
 
-	UID int
-	GID int
+	UID         int
+	GID         int
+	HomeHostDir string
 
 	Stdin  io.Reader
 	Stdout io.WriteCloser
@@ -43,8 +45,8 @@ type ResourceLimits struct {
 	FSize   int64
 }
 
-func NewSandboxRunner() *SandboxRunner {
-	return &SandboxRunner{}
+func NewDockerRunner() *DockerRunner {
+	return &DockerRunner{}
 }
 
 type Handle struct {
@@ -59,7 +61,7 @@ func makeULimit(name string, lim int64) *units.Ulimit {
 	}
 }
 
-func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error) {
+func (e *DockerRunner) Run(ctx context.Context, task *RunTask) (*Handle, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create docker client")
@@ -67,6 +69,7 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 
 	log.Println("create")
 
+	containerHomeDir := "/home/proclet"
 	hostConfig := &container.HostConfig{
 		AutoRemove:     true,
 		ReadonlyRootfs: true,
@@ -83,15 +86,24 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 				makeULimit("fsize", task.Limits.FSize),
 			},
 		},
+		Mounts: []mount.Mount{
+			{
+				Type:   mount.TypeBind,
+				Source: task.HomeHostDir,
+				Target: containerHomeDir,
+			},
+		},
 	}
+	// log.Printf("hostConfig: %+v", hostConfig)
 
-	stopTimeout := 3 // seec
+	stopTimeout := 3 // sec
 	resp, err := cli.ContainerCreate(ctx, &container.Config{
 		Image:       task.Image,
-		Cmd:         []string{"/bin/sh", "-c", task.Cmd},
+		Cmd:         []string{"/bin/sh", "-c", task.ShellCmd},
 		StopSignal:  "SIGKILL",
 		StopTimeout: &stopTimeout,
 		User:        fmt.Sprintf("%d:%d", task.UID, task.GID),
+		WorkingDir:  containerHomeDir,
 	}, hostConfig, nil, nil, "")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create container")
@@ -116,11 +128,16 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 			var stats types.StatsJSON
 			err = json.NewDecoder(statsResp.Body).Decode(&stats)
 			if err != nil {
-				log.Println("err(status): ", err)
-				break
+				switch {
+				case errors.Is(err, context.Canceled):
+					// ignore
+				default:
+					log.Println("err(status): ", err)
+				}
+				return
 			}
 
-			log.Printf("read: %+v", stats)
+			// log.Printf("read: %+v", stats)
 		}
 	}()
 
@@ -164,7 +181,7 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 
 		select {
 		case <-ctx.Done():
-			log.Println("ctx done")
+			log.Printf("ctx done: %+v", ctx.Err())
 
 		case resp := <-respCh:
 			log.Printf("resp: %+v", resp)
@@ -186,6 +203,7 @@ func (e *SandboxRunner) Run(ctx context.Context, task *RunTask) (*Handle, error)
 		select {
 		case <-handle.DoneCh:
 			log.Println("done")
+
 		case <-t.C:
 			immidiate := 0
 			err := cli.ContainerStop(stopCtx, containerID, container.StopOptions{

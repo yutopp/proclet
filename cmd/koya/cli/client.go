@@ -26,7 +26,16 @@ var clientCmd = &cobra.Command{
 
 		ctx := cmd.Context()
 		stream, err := c.RunOneshot(ctx, connect.NewRequest(&apiv1pb.RunOneshotRequest{
-			Code: "ulimit -a; uname -a; whoami; sleep 5; echo hello",
+			LanguageId:  "test-lang",
+			ProcessorId: "a-latest",
+			TaskId:      "run",
+
+			Files: []*apiv1pb.File{
+				{
+					Path:    "main.sh",
+					Content: []byte("ulimit -a; uname -a; whoami; sleep 5; echo hello"),
+				},
+			},
 		}))
 		if err != nil {
 			log.Panicf("failed to run: %s", err)
