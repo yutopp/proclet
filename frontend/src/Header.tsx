@@ -2,7 +2,7 @@ import React from 'react'
 import { config } from "./constants";
 import RunButton from './RunButton'
 import { Language, Processor, Task } from "./proto/api/v1/server_pb";
-import { AppBar, FormControl, InputLabel, MenuItem, Select, Toolbar, Typography } from "@mui/material";
+import { AppBar, Button, FormControl, InputLabel, MenuItem, Select, Toolbar, Typography } from "@mui/material";
 
 export type Props = {
   languages: Language[];
@@ -66,6 +66,8 @@ export const Header = ({ languages, executionState, handleButtonClick }: Props) 
           >
             Proclet (α) {config.PROD ? "" : "(dev)"}
           </Typography>
+
+          <Button color="inherit" href="https://github.com/yutopp/proclet" target="_blank" rel="noopener">GITHUB</Button>
 
           <FormControl sx={{ m: 1, minWidth: 120 }} size="small" >
             <InputLabel id="select-language-label" className="labelInsideAppBar">Language</InputLabel>
