@@ -1,57 +1,86 @@
-//import { useState } from 'react'
-
-import { createPromiseClient, ConnectError } from "@connectrpc/connect";
-import { createConnectTransport } from "@connectrpc/connect-web";
-import { KoyaService } from "./proto/api/v1/server_connect";
 import React from 'react'
-import { Terminal } from 'xterm'
-import { config } from "./constants";
+import { Code, ConnectError } from "@connectrpc/connect";
+import { KoyaService } from "./proto/api/v1/server_connect";
+import { Header } from './Header'
 import './App.css'
+import { Terminal } from 'xterm'
 import 'xterm/css/xterm.css';
+import { Language } from "./proto/api/v1/server_pb";
+import { Box, Container, Grid } from "@mui/material";
+import { useClient } from "./client";
+import { EditorView } from '@codemirror/view'
+import { EditorState } from '@codemirror/state'
+import { basicSetup } from 'codemirror'
 
-type HeaderProps = {
-  executionState: boolean;
-  handleButtonClick: () => void;
-};
-
-const Header = ({ executionState, handleButtonClick }: HeaderProps) => {
-  return (
-    <header className="py-4 bg-blue-500 text-white text-center flex justify-between items-center">
-      <h1 className="text-2xl font-bold ml-4">Proclet {config.PROD ? "" : "(dev)"}</h1>
-      <button className="px-4 py-2 bg-white text-blue-500 rounded mr-4" onClick={handleButtonClick}>{executionState ? "!" : "?"}Run</button>
-    </header>
-  );
-};
+function encodeUTF8(str: string): Uint8Array {
+  const encoder = new TextEncoder();
+  return encoder.encode(str);
+}
 
 function App() {
   const ref = React.useRef<HTMLDivElement>(null);
-  const termRef = React.useRef<{ term: Terminal, open: boolean }>({ term: new Terminal({convertEol: true}), open: false });
+  const termRef = React.useRef<{ term: Terminal, open: boolean }>({ term: new Terminal({ convertEol: true }), open: false });
+
+  const editorDOMRef = React.useRef<HTMLDivElement>(null);
+  const editorRef = React.useRef<{ view: EditorView | null, created: boolean }>({ view: null, created: false });
+
   const abortControllerRef = React.useRef<AbortController>(new AbortController());
   const [executionState, setExecutionState] = React.useState(false);
   const [mainSource, setMainSource] = React.useState("ulimit -a; uname -a; whoami; sleep 5; echo hello");
+  const [languages, setLanguages] = React.useState<Language[]>([]);
+  const client = useClient(KoyaService);
 
   React.useEffect(() => {
-    if (termRef.current.open == false) {
+    const abort = new AbortController();
+    const asyncFn = async () => {
+      try {
+        const resp = await client.list({}, { signal: abort.signal });
+        setLanguages(resp.languages);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    asyncFn();
+  }, []);
+
+  React.useEffect(() => {
+    if (!termRef.current.open && ref.current != null) {
       termRef.current.open = true;
       termRef.current.term.open(ref.current!);
     }
-  }, [])
+  }, []);
 
-  const fetchData = async (source: string, signal: AbortSignal) => {
-    const transport = createConnectTransport({
-      baseUrl: config.BACKEND_URL,
-    });
-    const client = createPromiseClient(KoyaService, transport);
-
+  const runOneshot = async (langId: string, procId: string, taskId: string, source: string, signal: AbortSignal) => {
     try {
+      let lang = languages.find((lang) => lang.id == langId);
+      if (lang == null) {
+        throw new Error("language not found");
+      }
+      let proc = lang.processors.find((proc) => proc.id == procId);
+      if (proc == null) {
+        throw new Error("processor not found");
+      }
+      let task = proc.tasks.find((task) => task.id == taskId);
+      if (task == null) {
+        throw new Error("task not found");
+      }
+
       const opts = {
         signal: signal,
       };
       const call = client.runOneshot({
-        code: source,
+        languageId: langId,
+        processorId: procId,
+        taskId: taskId,
+
+        files: [
+          {
+            path: proc.defaultFilename,
+            content: encodeUTF8(source),
+          },
+        ],
       }, opts);
       for await (const message of call) {
-        console.log("got a message", message)
         switch (message.response.case) {
           case "output":
             // TODO: stderr
@@ -62,15 +91,62 @@ function App() {
     }
     catch (e) {
       if (e instanceof ConnectError) {
-        console.error(e.code, e.message, e.metadata);
+        switch (e.code) {
+          case Code.Canceled:
+            break; // ignore
+          default:
+            console.error("connect error", e.code, e.message, e.metadata);
+            break;
+        }
       } else {
-        console.error(e);
+        console.error("general error", e);
       }
     }
   };
 
-  const handleButtonClick = () => {
-    abortControllerRef.current.abort();
+  React.useEffect(() => {
+    if (editorRef.current.created || editorDOMRef.current == null) {
+      return;
+    }
+
+    console.log("creating editor");
+
+    const updateCallback = EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        setMainSource(update.state.doc.toString());
+      }
+    });
+
+    const fixedHeightEditor = EditorView.theme({
+      "&": { height: "100%", maxHeight: "100%" },
+      ".cm-scroller": { overflow: "auto" }
+    })
+
+    const state = EditorState.create({
+      doc: mainSource,
+      extensions: [
+        basicSetup,
+        updateCallback,
+        fixedHeightEditor,
+      ],
+    });
+
+    const view = new EditorView({
+      state,
+      parent: editorDOMRef.current,
+    });
+    editorRef.current.created = true;
+    editorRef.current.view = view;
+
+    return () => {
+      // view.destroy();
+      // editor.current.removeEventListener("input", log);
+    };
+  }, []);
+
+  const handleButtonClick = (langId: string, procId: string, taskId: string) => {
+    abortControllerRef.current?.abort();
+
     termRef.current.term.reset();
     setExecutionState(true);
 
@@ -78,39 +154,36 @@ function App() {
     abortControllerRef.current = newAbortController;
 
     const source = mainSource;
-    fetchData(source, newAbortController.signal).finally(() => {
+    runOneshot(langId, procId, taskId, source, newAbortController.signal).finally(() => {
       setExecutionState(false);
     });
   };
 
   return (
-    <>
-      <div className="min-h-screen flex flex-col bg-gray-100">
-        <Header executionState={executionState} handleButtonClick={handleButtonClick} />
+    <Box display="flex" flexDirection="column" height="100vh">
+      <Header languages={languages} executionState={executionState} handleButtonClick={handleButtonClick} />
 
-        {/* Main Content */}
-        <div className="flex-1 flex bg-gray-100">
-          {/* Left Section */}
-          <div className="flex-1 flex flex-col items-center justify-center">
-            <textarea
-              className="w-full h-full p-4 border rounded"
-              placeholder="Enter your text here..."
-              defaultValue={mainSource}
-              onChange={(e) => setMainSource(e.target.value)}
-            />
-          </div>
+      <Container component="main" maxWidth={false} sx={{ flexGrow: 1, overflow: 'auto', height: 'calc(100vh - 64px)' }}>
+        {/* Grid to split the container horizontally */}
+        <Grid container spacing={2} sx={{ height: 'calc(100vh - 64px)' }}>
 
-          {/* Right Section */}
-          <div className="flex-1 flex flex-col items-center justify-center">
-            <div
-              ref={ref}
-              className="w-full h-full p-4 border rounded"
-            ></div>
-          </div>
-        </div>
-      </div>
-    </>
-  )
+          {/* Left half */}
+          <Grid item xs={6}>
+            <Box sx={{ height: 'calc(100vh - 64px)' }}>
+              <div ref={editorDOMRef} className="w-full h-full"></div>
+            </Box>
+          </Grid>
+
+          {/* Right half */}
+          <Grid item xs={6}>
+            <Box sx={{ height: 'calc(100vh - 64px)' }}>
+              <div ref={ref} className="w-full h-full"></div>
+            </Box>
+          </Grid>
+        </Grid>
+      </Container>
+    </Box>
+  );
 }
 
 export default App
