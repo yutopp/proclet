@@ -24,3 +24,11 @@ deploy: build-linux-amd64
 .PHONY: docker-up
 docker-up:
 	docker compose up -d --force-recreate --build
+
+.PHONY: docker-deploy
+docker-deploy:
+	aws ecr get-login-password --region us-east-1 --profile oc-prod | docker login --username AWS --password-stdin $(PROCLET_IMAGE_ROOT)
+	docker build --platform linux/amd64 -t $(PROCLET_IMAGE_ROOT)/frontend:latest ./frontend/
+	docker push $(PROCLET_IMAGE_ROOT)/frontend:latest
+	docker build --platform linux/amd64 -t $(PROCLET_IMAGE_ROOT)/backend:latest .
+	docker push $(PROCLET_IMAGE_ROOT)/backend:latest

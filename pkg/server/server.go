@@ -11,10 +11,11 @@ import (
 	"sync"
 
 	"connectrpc.com/connect"
+	"github.com/cockroachdb/errors"
+	"github.com/yutopp/koya/pkg/domain"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/pkg/errors"
 	apiv1pb "github.com/yutopp/koya/pkg/proto/api/v1"
 	v1 "github.com/yutopp/koya/pkg/proto/api/v1"
 	apiv1connect "github.com/yutopp/koya/pkg/proto/api/v1/v1connect"
@@ -22,6 +23,8 @@ import (
 )
 
 type Config struct {
+	ProfilePath string
+
 	TempDir   string
 	RunnerUID int
 	RunnerGID int
@@ -49,10 +52,16 @@ func NewServer(c *Config) *Server {
 }
 
 func (s *Server) List(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.ListResponse], error) {
-	res := &v1.ListResponse{
-		Languages: make([]*apiv1pb.Language, 0, len(L)),
+	profileRepo := NewProfileFromFile(s.config.ProfilePath)
+	profile, err := profileRepo.Load()
+	if err != nil {
+		return nil, err
 	}
-	for _, l := range L {
+
+	res := &v1.ListResponse{
+		Languages: make([]*apiv1pb.Language, 0, len(profile.Languages)),
+	}
+	for _, l := range profile.Languages {
 		lang := &apiv1pb.Language{
 			Id:       l.ID,
 			ShowName: l.ShowName,
@@ -101,7 +110,7 @@ func (s *Server) RunOneshot(
 	req *connect.Request[apiv1pb.RunOneshotRequest],
 	stream *connect.ServerStream[apiv1pb.RunOneshotResponse],
 ) error {
-	_, proc, task, err := lookupLanguage(req.Msg.LanguageId, req.Msg.ProcessorId, req.Msg.TaskId)
+	_, proc, task, err := s.lookupLanguage(req.Msg.LanguageId, req.Msg.ProcessorId, req.Msg.TaskId)
 	if err != nil {
 		return err
 	}
@@ -168,7 +177,7 @@ func buildShellCmd(cmd []string) string {
 	return strings.Join(cmd, " ")
 }
 
-func executePhase(ctx context.Context, c *executeConfig, phase *PhasedTask) error {
+func executePhase(ctx context.Context, c *executeConfig, phase *domain.PhasedTask) error {
 	e := container.NewDockerRunner()
 
 	stdoutR, stdoutW := io.Pipe()
@@ -274,71 +283,15 @@ func redirect(ctx context.Context, wg *sync.WaitGroup, pipe *io.PipeReader, call
 	}
 }
 
-type Language struct {
-	ID         string
-	ShowName   string
-	Processors []Processor
-}
+func (s *Server) lookupLanguage(languageID, processorID, taskID string) (*domain.Language, *domain.Processor, *domain.Task, error) {
+	profileRepo := NewProfileFromFile(s.config.ProfilePath)
+	profile, err := profileRepo.Load()
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
-type Processor struct {
-	ID       string
-	ShowName string
-
-	DockerImage string
-
-	DefaultFilename string
-
-	Tasks []Task
-}
-
-type Task struct {
-	ID       string
-	ShowName string
-
-	Kind string // "action" | "tool"
-
-	Compile *PhasedTask
-	Run     *PhasedTask
-}
-
-type PhasedTask struct {
-	Cmd []string
-}
-
-var L = []Language{
-	{
-		ID:       "test-shell",
-		ShowName: "Test Shell",
-
-		Processors: []Processor{
-			{
-				ID:       "alpine-sh-latest",
-				ShowName: "sh (alpine:latest)",
-
-				DockerImage: "alpine:latest",
-
-				DefaultFilename: "main.sh",
-
-				Tasks: []Task{
-					{
-						ID:       "run",
-						Kind:     "action",
-						ShowName: "Run",
-
-						Compile: nil,
-						Run: &PhasedTask{
-							Cmd: []string{"sh", "main.sh"},
-						},
-					},
-				},
-			},
-		},
-	},
-}
-
-func lookupLanguage(languageID, processorID, taskID string) (*Language, *Processor, *Task, error) {
-	var lang *Language
-	for _, l := range L {
+	var lang *domain.Language
+	for _, l := range profile.Languages {
 		if l.ID == languageID {
 			lang = &l
 			break
@@ -348,7 +301,7 @@ func lookupLanguage(languageID, processorID, taskID string) (*Language, *Process
 		return nil, nil, nil, errors.Errorf("language not found: '%s'", languageID)
 	}
 
-	var proc *Processor
+	var proc *domain.Processor
 	for _, p := range lang.Processors {
 		if p.ID == processorID {
 			proc = &p
@@ -359,7 +312,7 @@ func lookupLanguage(languageID, processorID, taskID string) (*Language, *Process
 		return nil, nil, nil, errors.Errorf("processor not found: '%s'", processorID)
 	}
 
-	var task *Task
+	var task *domain.Task
 	for _, t := range proc.Tasks {
 		if t.ID == taskID {
 			task = &t

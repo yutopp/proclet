@@ -45,6 +45,8 @@ func run(port int) {
 	mux := http.NewServeMux()
 
 	srv := apiv1.NewServer(&apiv1.Config{
+		ProfilePath: profilePath,
+
 		RunnerUID: uid,
 		RunnerGID: gid,
 

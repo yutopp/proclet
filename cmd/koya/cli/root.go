@@ -7,8 +7,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var profilePath string
+
 var rootCmd = &cobra.Command{
 	Use: "koya",
+}
+
+func init() {
+	rootCmd.Flags().StringVar(&profilePath, "profilePath", "/tmp/proclet.profile.json", "profile path")
 }
 
 func Execute() {
