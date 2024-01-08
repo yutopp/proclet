@@ -1,24 +1,71 @@
 syntax = "proto3";
 
-package v1;
+import "google/protobuf/empty.proto";
 
-option go_package="github.com/yutopp/koya/pkg/proto/api/v1";
+package proto.api.v1;
+
+option go_package="github.com/yutopp/koya/pkg/proto/api/v1;v1";
 
 service KoyaService {
+  rpc List (google.protobuf.Empty) returns (ListResponse) {}
   rpc RunOneshot (RunOneshotRequest) returns (stream RunOneshotResponse) {}
 }
 
+message ListResponse {
+  repeated Language languages = 1;
+}
+
 message RunOneshotRequest {
-  string code = 1;
+  string language_id = 1;
+  string processor_id = 2;
+  string task_id = 3;
+
+  repeated File files = 4;
 }
 
 message RunOneshotResponse {
+  string phase = 1;
   oneof response {
-    Output output = 1;
+    Output output = 2;
   }
+}
+
+message File {
+  string path = 1;
+  bytes content = 2;
 }
 
 message Output {
   int64 kind = 1;   // 0 = stdout, 1 = stderr
   bytes buffer = 2; // utf8
+}
+
+message Language {
+  string id = 1;
+  string show_name = 2;
+  repeated Processor processors = 3;
+}
+
+message Processor {
+  string id = 1;
+  string show_name = 2;
+  string description = 3;
+
+  string default_filename = 4;
+
+  repeated Task tasks = 5;
+}
+
+message Task {
+  string id = 1;
+  string show_name = 2;
+  string description = 3;
+  string kind = 4;
+
+  PhasedTask compile = 5;
+  PhasedTask run = 6;
+}
+
+message PhasedTask {
+
 }
