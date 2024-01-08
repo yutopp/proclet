@@ -57,8 +57,14 @@ export const Header = ({ languages, executionState, handleButtonClick }: Props) 
     <>
       <AppBar position="sticky">
         <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Proclet(α) {config.PROD ? "" : "(dev)"}
+          <Typography
+            variant="h5"
+            noWrap
+            component="a"
+            href="/"
+            sx={{ flexGrow: 1, fontWeight: 700, textDecoration: 'none', color: 'inherit' }}
+          >
+            Proclet (α) {config.PROD ? "" : "(dev)"}
           </Typography>
 
           <FormControl sx={{ m: 1, minWidth: 120 }} size="small" >
