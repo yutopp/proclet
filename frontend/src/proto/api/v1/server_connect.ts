@@ -7,13 +7,13 @@ import { Empty, MethodKind } from "@bufbuild/protobuf";
 import { ListResponse, RunOneshotRequest, RunOneshotResponse } from "./server_pb.js";
 
 /**
- * @generated from service proto.api.v1.KoyaService
+ * @generated from service proto.api.v1.RunnerService
  */
-export const KoyaService = {
-  typeName: "proto.api.v1.KoyaService",
+export const RunnerService = {
+  typeName: "proto.api.v1.RunnerService",
   methods: {
     /**
-     * @generated from rpc proto.api.v1.KoyaService.List
+     * @generated from rpc proto.api.v1.RunnerService.List
      */
     list: {
       name: "List",
@@ -22,7 +22,7 @@ export const KoyaService = {
       kind: MethodKind.Unary,
     },
     /**
-     * @generated from rpc proto.api.v1.KoyaService.RunOneshot
+     * @generated from rpc proto.api.v1.RunnerService.RunOneshot
      */
     runOneshot: {
       name: "RunOneshot",

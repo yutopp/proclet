@@ -1,6 +1,6 @@
 import React from 'react'
 import { Code, ConnectError } from "@connectrpc/connect";
-import { KoyaService } from "./proto/api/v1/server_connect";
+import { RunnerService } from "./proto/api/v1/server_connect";
 import { Header } from './Header'
 import './App.css'
 import { Terminal } from 'xterm'
@@ -28,7 +28,7 @@ function App() {
   const [executionState, setExecutionState] = React.useState(false);
   const [mainSource, setMainSource] = React.useState("ulimit -a; uname -a; whoami; sleep 5; echo hello");
   const [languages, setLanguages] = React.useState<Language[]>([]);
-  const client = useClient(KoyaService);
+  const client = useClient(RunnerService);
 
   React.useEffect(() => {
     const abort = new AbortController();

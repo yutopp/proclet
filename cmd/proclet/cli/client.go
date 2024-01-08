@@ -7,8 +7,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/spf13/cobra"
 
-	apiv1pb "github.com/yutopp/koya/pkg/proto/api/v1"
-	apiv1connect "github.com/yutopp/koya/pkg/proto/api/v1/v1connect"
+	apiv1pb "github.com/yutopp/proclet/pkg/proto/api/v1"
+	apiv1connect "github.com/yutopp/proclet/pkg/proto/api/v1/v1connect"
 )
 
 var addr string
@@ -22,7 +22,7 @@ func init() {
 var clientCmd = &cobra.Command{
 	Use: "client",
 	Run: func(cmd *cobra.Command, args []string) {
-		c := apiv1connect.NewKoyaServiceClient(http.DefaultClient, addr, connect.WithGRPC())
+		c := apiv1connect.NewRunnerServiceClient(http.DefaultClient, addr, connect.WithGRPC())
 
 		ctx := cmd.Context()
 		stream, err := c.RunOneshot(ctx, connect.NewRequest(&apiv1pb.RunOneshotRequest{

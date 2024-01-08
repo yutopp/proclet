@@ -4,9 +4,9 @@ import "google/protobuf/empty.proto";
 
 package proto.api.v1;
 
-option go_package="github.com/yutopp/koya/pkg/proto/api/v1;v1";
+option go_package="github.com/yutopp/proclet/pkg/proto/api/v1;v1";
 
-service KoyaService {
+service RunnerService {
   rpc List (google.protobuf.Empty) returns (ListResponse) {}
   rpc RunOneshot (RunOneshotRequest) returns (stream RunOneshotResponse) {}
 }

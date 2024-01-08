@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/yutopp/koya/pkg/domain"
-	"github.com/yutopp/koya/pkg/server"
+	"github.com/yutopp/proclet/pkg/domain"
+	"github.com/yutopp/proclet/pkg/server"
 )
 
 var profileCmd = &cobra.Command{

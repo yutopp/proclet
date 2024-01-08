@@ -12,14 +12,14 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/cockroachdb/errors"
-	"github.com/yutopp/koya/pkg/domain"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	apiv1pb "github.com/yutopp/koya/pkg/proto/api/v1"
-	v1 "github.com/yutopp/koya/pkg/proto/api/v1"
-	apiv1connect "github.com/yutopp/koya/pkg/proto/api/v1/v1connect"
-	"github.com/yutopp/koya/pkg/service/container"
+	"github.com/yutopp/proclet/pkg/domain"
+	apiv1pb "github.com/yutopp/proclet/pkg/proto/api/v1"
+	v1 "github.com/yutopp/proclet/pkg/proto/api/v1"
+	apiv1connect "github.com/yutopp/proclet/pkg/proto/api/v1/v1connect"
+	"github.com/yutopp/proclet/pkg/service/container"
 )
 
 type Config struct {
@@ -32,16 +32,16 @@ type Config struct {
 	Logger *zap.Logger
 }
 
-// Server implements the KoyaServiceServer interface
+// Server implements the RunnerServiceHandler interface
 type Server struct {
 	config *Config
 }
 
-var _ apiv1connect.KoyaServiceHandler = (*Server)(nil)
+var _ apiv1connect.RunnerServiceHandler = (*Server)(nil)
 
 func Register(mux *http.ServeMux, srv *Server) {
 	loggingInterceptor := NewLoggingInterceptor(srv.config.Logger)
-	path, handler := apiv1connect.NewKoyaServiceHandler(srv, connect.WithInterceptors(loggingInterceptor))
+	path, handler := apiv1connect.NewRunnerServiceHandler(srv, connect.WithInterceptors(loggingInterceptor))
 	mux.Handle(path, handler)
 }
 

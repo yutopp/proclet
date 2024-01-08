@@ -8,7 +8,7 @@ import (
 	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
-	v1 "github.com/yutopp/koya/pkg/proto/api/v1"
+	v1 "github.com/yutopp/proclet/pkg/proto/api/v1"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	http "net/http"
 	strings "strings"
@@ -22,8 +22,8 @@ import (
 const _ = connect.IsAtLeastVersion1_13_0
 
 const (
-	// KoyaServiceName is the fully-qualified name of the KoyaService service.
-	KoyaServiceName = "proto.api.v1.KoyaService"
+	// RunnerServiceName is the fully-qualified name of the RunnerService service.
+	RunnerServiceName = "proto.api.v1.RunnerService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -34,109 +34,110 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// KoyaServiceListProcedure is the fully-qualified name of the KoyaService's List RPC.
-	KoyaServiceListProcedure = "/proto.api.v1.KoyaService/List"
-	// KoyaServiceRunOneshotProcedure is the fully-qualified name of the KoyaService's RunOneshot RPC.
-	KoyaServiceRunOneshotProcedure = "/proto.api.v1.KoyaService/RunOneshot"
+	// RunnerServiceListProcedure is the fully-qualified name of the RunnerService's List RPC.
+	RunnerServiceListProcedure = "/proto.api.v1.RunnerService/List"
+	// RunnerServiceRunOneshotProcedure is the fully-qualified name of the RunnerService's RunOneshot
+	// RPC.
+	RunnerServiceRunOneshotProcedure = "/proto.api.v1.RunnerService/RunOneshot"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	koyaServiceServiceDescriptor          = v1.File_proto_api_v1_server_proto.Services().ByName("KoyaService")
-	koyaServiceListMethodDescriptor       = koyaServiceServiceDescriptor.Methods().ByName("List")
-	koyaServiceRunOneshotMethodDescriptor = koyaServiceServiceDescriptor.Methods().ByName("RunOneshot")
+	runnerServiceServiceDescriptor          = v1.File_proto_api_v1_server_proto.Services().ByName("RunnerService")
+	runnerServiceListMethodDescriptor       = runnerServiceServiceDescriptor.Methods().ByName("List")
+	runnerServiceRunOneshotMethodDescriptor = runnerServiceServiceDescriptor.Methods().ByName("RunOneshot")
 )
 
-// KoyaServiceClient is a client for the proto.api.v1.KoyaService service.
-type KoyaServiceClient interface {
+// RunnerServiceClient is a client for the proto.api.v1.RunnerService service.
+type RunnerServiceClient interface {
 	List(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.ListResponse], error)
 	RunOneshot(context.Context, *connect.Request[v1.RunOneshotRequest]) (*connect.ServerStreamForClient[v1.RunOneshotResponse], error)
 }
 
-// NewKoyaServiceClient constructs a client for the proto.api.v1.KoyaService service. By default, it
-// uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and sends
-// uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or
-// connect.WithGRPCWeb() options.
+// NewRunnerServiceClient constructs a client for the proto.api.v1.RunnerService service. By
+// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
+// and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
+// connect.WithGRPC() or connect.WithGRPCWeb() options.
 //
 // The URL supplied here should be the base URL for the Connect or gRPC server (for example,
 // http://api.acme.com or https://acme.com/grpc).
-func NewKoyaServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) KoyaServiceClient {
+func NewRunnerServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) RunnerServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
-	return &koyaServiceClient{
+	return &runnerServiceClient{
 		list: connect.NewClient[emptypb.Empty, v1.ListResponse](
 			httpClient,
-			baseURL+KoyaServiceListProcedure,
-			connect.WithSchema(koyaServiceListMethodDescriptor),
+			baseURL+RunnerServiceListProcedure,
+			connect.WithSchema(runnerServiceListMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		runOneshot: connect.NewClient[v1.RunOneshotRequest, v1.RunOneshotResponse](
 			httpClient,
-			baseURL+KoyaServiceRunOneshotProcedure,
-			connect.WithSchema(koyaServiceRunOneshotMethodDescriptor),
+			baseURL+RunnerServiceRunOneshotProcedure,
+			connect.WithSchema(runnerServiceRunOneshotMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 	}
 }
 
-// koyaServiceClient implements KoyaServiceClient.
-type koyaServiceClient struct {
+// runnerServiceClient implements RunnerServiceClient.
+type runnerServiceClient struct {
 	list       *connect.Client[emptypb.Empty, v1.ListResponse]
 	runOneshot *connect.Client[v1.RunOneshotRequest, v1.RunOneshotResponse]
 }
 
-// List calls proto.api.v1.KoyaService.List.
-func (c *koyaServiceClient) List(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[v1.ListResponse], error) {
+// List calls proto.api.v1.RunnerService.List.
+func (c *runnerServiceClient) List(ctx context.Context, req *connect.Request[emptypb.Empty]) (*connect.Response[v1.ListResponse], error) {
 	return c.list.CallUnary(ctx, req)
 }
 
-// RunOneshot calls proto.api.v1.KoyaService.RunOneshot.
-func (c *koyaServiceClient) RunOneshot(ctx context.Context, req *connect.Request[v1.RunOneshotRequest]) (*connect.ServerStreamForClient[v1.RunOneshotResponse], error) {
+// RunOneshot calls proto.api.v1.RunnerService.RunOneshot.
+func (c *runnerServiceClient) RunOneshot(ctx context.Context, req *connect.Request[v1.RunOneshotRequest]) (*connect.ServerStreamForClient[v1.RunOneshotResponse], error) {
 	return c.runOneshot.CallServerStream(ctx, req)
 }
 
-// KoyaServiceHandler is an implementation of the proto.api.v1.KoyaService service.
-type KoyaServiceHandler interface {
+// RunnerServiceHandler is an implementation of the proto.api.v1.RunnerService service.
+type RunnerServiceHandler interface {
 	List(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.ListResponse], error)
 	RunOneshot(context.Context, *connect.Request[v1.RunOneshotRequest], *connect.ServerStream[v1.RunOneshotResponse]) error
 }
 
-// NewKoyaServiceHandler builds an HTTP handler from the service implementation. It returns the path
-// on which to mount the handler and the handler itself.
+// NewRunnerServiceHandler builds an HTTP handler from the service implementation. It returns the
+// path on which to mount the handler and the handler itself.
 //
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
-func NewKoyaServiceHandler(svc KoyaServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	koyaServiceListHandler := connect.NewUnaryHandler(
-		KoyaServiceListProcedure,
+func NewRunnerServiceHandler(svc RunnerServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	runnerServiceListHandler := connect.NewUnaryHandler(
+		RunnerServiceListProcedure,
 		svc.List,
-		connect.WithSchema(koyaServiceListMethodDescriptor),
+		connect.WithSchema(runnerServiceListMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
-	koyaServiceRunOneshotHandler := connect.NewServerStreamHandler(
-		KoyaServiceRunOneshotProcedure,
+	runnerServiceRunOneshotHandler := connect.NewServerStreamHandler(
+		RunnerServiceRunOneshotProcedure,
 		svc.RunOneshot,
-		connect.WithSchema(koyaServiceRunOneshotMethodDescriptor),
+		connect.WithSchema(runnerServiceRunOneshotMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
-	return "/proto.api.v1.KoyaService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return "/proto.api.v1.RunnerService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case KoyaServiceListProcedure:
-			koyaServiceListHandler.ServeHTTP(w, r)
-		case KoyaServiceRunOneshotProcedure:
-			koyaServiceRunOneshotHandler.ServeHTTP(w, r)
+		case RunnerServiceListProcedure:
+			runnerServiceListHandler.ServeHTTP(w, r)
+		case RunnerServiceRunOneshotProcedure:
+			runnerServiceRunOneshotHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
 	})
 }
 
-// UnimplementedKoyaServiceHandler returns CodeUnimplemented from all methods.
-type UnimplementedKoyaServiceHandler struct{}
+// UnimplementedRunnerServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedRunnerServiceHandler struct{}
 
-func (UnimplementedKoyaServiceHandler) List(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.ListResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("proto.api.v1.KoyaService.List is not implemented"))
+func (UnimplementedRunnerServiceHandler) List(context.Context, *connect.Request[emptypb.Empty]) (*connect.Response[v1.ListResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("proto.api.v1.RunnerService.List is not implemented"))
 }
 
-func (UnimplementedKoyaServiceHandler) RunOneshot(context.Context, *connect.Request[v1.RunOneshotRequest], *connect.ServerStream[v1.RunOneshotResponse]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("proto.api.v1.KoyaService.RunOneshot is not implemented"))
+func (UnimplementedRunnerServiceHandler) RunOneshot(context.Context, *connect.Request[v1.RunOneshotRequest], *connect.ServerStream[v1.RunOneshotResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("proto.api.v1.RunnerService.RunOneshot is not implemented"))
 }

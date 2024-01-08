@@ -6,7 +6,7 @@ import (
 
 	"github.com/cockroachdb/errors"
 
-	"github.com/yutopp/koya/pkg/domain"
+	"github.com/yutopp/proclet/pkg/domain"
 )
 
 type ProfileFromFile struct {

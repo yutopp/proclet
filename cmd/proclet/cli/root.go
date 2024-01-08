@@ -10,7 +10,7 @@ import (
 var profilePath string
 
 var rootCmd = &cobra.Command{
-	Use: "koya",
+	Use: "proclet",
 }
 
 func init() {

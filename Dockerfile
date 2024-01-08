@@ -9,4 +9,4 @@ RUN make build
 FROM alpine:3.18
 COPY --from=build /app/bin/ /app/bin/
 
-CMD ["/app/bin/koya", "server"]
+CMD ["/app/bin/proclet", "server"]

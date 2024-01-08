@@ -16,7 +16,7 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
-	apiv1 "github.com/yutopp/koya/pkg/server"
+	apiv1 "github.com/yutopp/proclet/pkg/server"
 )
 
 var uid int

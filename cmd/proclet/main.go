@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/yutopp/koya/cmd/koya/cli"
+	"github.com/yutopp/proclet/cmd/proclet/cli"
 )
 
 func main() {
